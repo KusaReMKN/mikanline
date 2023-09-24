@@ -1,0 +1,159 @@
+*mikanline.txt*	ファイルに指定された自動コマンドを自動的に設定する
+
+Author: KusaReMKN <https://github.com/KusaReMKN>
+Repository: https://github.com/KusaReMKN/mikanline.vim
+License: The 2-Clause BSD License (BSD-2-Clause)
+
+
+もくじ                                                    *mikanline-contents*
+
+  1. 概要                                         |mikanline-introduction|
+  2. 用語                                         |mikanline-terminology|
+  3. mikanline の書式                             |mikanline-syntax|
+  4. 使いかた                                     |mikanline-usage|
+    a) g:mikanline の設定
+    b) mikanline の配置
+    c) mikanline が読み込まれるタイミング
+  5. ToDo                                         |mikanline-todo|
+
+==============================================================================
+ 1. 概要                                              *mikanline-introduction*
+
+     *mikanline* は、ファイルの先頭や末尾の数行に配置された、|modeline| のよう
+     な行に記述された一連の指示に従って、自動コマンド（|autocmd|）を自動的に設
+     定する Vim プラグインです。
+
+     このプラグインは、もともと、ファイルに含まれる句読点（、。）をカンマとピ
+     リオド（，．）に置き換える処理を、ファイル書き込み前に自動的に行いたいと
+     いう思いから開発されました。
+
+     このプラグインの最新版を GitHub から入手できます:
+
+           https://github.com/KusaReMKN/mikanline.vim
+
+
+==============================================================================
+2 . 用語                                               *mikanline-terminology*
+
+     mikanline の世界では次の用語を用います。
+
+     mikanline
+          ファイルの先頭や末尾の数行に配置される、|modeline| のような行です。
+
+     mikanline command
+          mikanline に羅列されるコマンドです。
+
+     command 若しくは コマンド
+          Vim のコマンドモードで実行できるコマンドです。
+
+
+==============================================================================
+ 3. mikanline の書式                                        *mikanline-syntax*
+
+     mikanline は、|modeline| の 2 つめの形式に似ている次のような行です。
+
+          [text{white}]mkn:{mikanline commands}:[text]
+
+     [text{white}]
+          1 個以上の空白文字（<Space> と <Tab>）が続く任意のテキストです。この
+          テキストは省略可能です。
+
+     mkn:
+          "mkn" という文字列にコロン ':' が続いたものです。"mkn" の部分の大文
+          字と小文字を区別するか否かはオプション 'ignorecase' の値によって制御
+          されます。
+
+     {mikanline commands}
+          1 個以上の空白文字かコロン ':' で区切られた、0 個以上の mikanline
+          command を並べたものです。
+
+     :
+          mikanline command の並びの終わりを示すコロン ':' です。
+
+     [text]
+          任意のテキストです。このテキストは省略可能です。このテキストにコロン
+          ':' が含まれていてはなりません。さもなければ、テキストの一部は
+          mikanline command として認識されます。
+
+     例えば、次の mikanline は有効です。この mikanline は forceComma と
+     forcePeriod の 2 個の mikanline command を持ちます。
+
+          % mkn: forceComma forcePeriod : ~
+
+     前後にテキストがあってもよいので、次の mikanline も有効です。しかし、
+     "mkn:" の直前には空白文字が必要であることに注意してください。
+
+          あ！ みて！「 mkn:Zzz: 」みかんちゃんは眠いのかもね。 ~
+
+     Note: {mikanline comamnds} の並び順は考慮されないことに注意してください。
+     {mikanline commands} の要素の順序を入れ替えてもコマンドの実行順序には影響
+     を及ぼしません。要素は mikanline を解釈する段階で内部的に整列され、重複が
+     取り除かれます。
+
+
+==============================================================================
+ 4. 使いかた                                                 *mikanline-usage*
+
+   a)  g:mikanline の設定
+
+     mikanline を利用するために、変数 *g:mikanline* を設定する必要があります。
+     これによって mikanline command の名前と、設定される自動コマンドの対応が定
+     義されます。
+
+     以下に g:mikanline の例を示します。                 *g:mikanline-example*
+>
+          let g:mikanline = {
+               \ 'forceComma': {
+                    \ 'BufWrite': [
+                         \ "let forceComma_pos = getpos('.')",
+                         \ 'g/、/s//，/',
+                         \ "call setpos('.', forceComma_pos)",
+                         \ 'unlet forceComma_pos'
+                    \ ]
+               \ },
+               \ 'Zzz': {
+                    \ 'SigUSR1': [ 'call mikanline#WakeUpMikan()' ]
+               \ }
+          \ }
+<
+     g:mikanline は辞書であり、キーに mikanline command の名前を、値に自動コマ
+     ンドを定義する辞書を取ります。
+
+     自動コマンドを定義する辞書は、キーに自動イベントの名前を、値にコマンドを
+     列挙したリストを取ります。キーとして指定可能な自動イベントの名前の一覧は
+     |autocmd-events| を参照してください。
+
+     リストに列挙されたコマンドはその順に自動コマンドに追加されます。つまり、
+     コマンドは列挙された順番に実行されます。
+
+
+   b)  mikanline の配置
+
+     mikanline command で指定した自動コマンドを自動的に設定したいファイルの先
+     頭か末尾の付近に mikanline を記述します。mikanline は 'modelines' で指定
+     された行数だけ調べられます。例えば、保存時に読点をカンマに置換したい TeX
+     ファイルには次のように記述します。
+
+          % mkn: forceComma : ~
+
+
+   c)  mikanline が読み込まれるタイミング
+
+     mikanline は、そのファイルが読み込まれたタイミングで解釈されます。つま
+     り、新しく作成したファイルに mikanline を記述しても解釈されません。
+
+     また、mikanline は 'modeline' がオフであったり 'modelines' がゼロであると
+     きには仕事をしません。
+
+
+==============================================================================
+ 5. ToDo                                                      *mikanline-todo*
+
+     mikanline はセキュリティについて何も考えられていません。このプラグインを
+     悪用することでファイルをめちゃくちゃにできるほか、|:!| や |system()| を経
+     由して任意のシステムコマンドを実行することすらできます。（|E992|）
+
+
+==============================================================================
+mkn:Zzz:
+vim:tw=78:ts=5:et:ft=help:norl:
